@@ -67,7 +67,9 @@ def generate_wave(E, z_start, z_end, t, num_points=100, k=2*np.pi, omega=2*np.pi
 
 def main():
     fig = plt.figure(figsize=(10, 8))
-    ax = fig.add_subplot(111, projection='3d')
+    # Use orthogonal projection to prevent transverse waves from looking longitudinal due to perspective
+    ax = fig.add_subplot(111, projection='3d', proj_type='ortho')
+    ax.view_init(elev=20, azim=-45)
     plt.subplots_adjust(bottom=0.35)
 
     # Setup parameters
