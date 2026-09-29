@@ -148,7 +148,7 @@ def setup_2d_plots(ax_t, ax_asym, delays):
     ax_t.set_ylabel(r"XUV Transmission ($T^+$ and $T^-$)", color=C_TEXT, fontsize=11, fontweight='bold')
     ax_t.set_ylim(0.0, 1.15)
     ax_t.set_yticks([0.0, 0.5, 1.0])
-    ax_t.set_yticklabels(["0.0 (Absorbed)", "0.5", "1.0 (Full)"])
+    ax_t.set_yticklabels(["0.0 (Absorbed)", "0.5", "1.0 (Transmitted)"])
     ax_t.axhline(1.0, color=C_MUTED, linestyle=':', linewidth=0.8, alpha=0.4)
 
     # Background theoretical reference traces
@@ -192,7 +192,7 @@ def build_simulation(output_path=None, preview_only=False, fps=30, duration_sec=
     draw_detector(ax_3d_plus, z_screen)
     badge_plus = setup_3d_axes(
         ax_3d_plus,
-        r"$\mathbf{\sigma^+}$ Pump  $\rightarrow$  Heavy Probe Absorption ($T^+ = 8\%$)",
+        r"$\mathbf{\sigma^+}$ Pump",
         C_PUMP_PLUS
     )
 
@@ -200,7 +200,7 @@ def build_simulation(output_path=None, preview_only=False, fps=30, duration_sec=
     draw_detector(ax_3d_minus, z_screen)
     badge_minus = setup_3d_axes(
         ax_3d_minus,
-        r"$\mathbf{\sigma^-}$ Pump  $\rightarrow$  High Probe Transmission ($T^- = 82\%$)",
+        r"$\mathbf{\sigma^-}$ Pump",
         C_PUMP_MINUS
     )
 
@@ -261,18 +261,6 @@ def build_simulation(output_path=None, preview_only=False, fps=30, duration_sec=
             current_tau = delays[-1] * ((t - t_hit) / (duration_sec - t_hit)) # 0.0 ps -> 5.0 ps
 
         idx_tau = int(np.clip(np.searchsorted(delays, current_tau), 0, len(delays) - 1))
-
-        # Status badge updates
-        if t < t_hit - 0.4:
-            badge_plus.set_text(r"Pump Approaching Sample ($\tau < 0$, Ground State)")
-            badge_plus.set_color(C_MUTED)
-            badge_minus.set_text(r"Pump Approaching Sample ($\tau < 0$, Ground State)")
-            badge_minus.set_color(C_MUTED)
-        else:
-            badge_plus.set_text(r"$\mathbf{\sigma^+}$ Pump  $\rightarrow$  Heavy Probe Absorption ($T^+ = 8\%$)")
-            badge_plus.set_color(C_PUMP_PLUS)
-            badge_minus.set_text(r"$\mathbf{\sigma^-}$ Pump  $\rightarrow$  High Probe Transmission ($T^- = 82\%$)")
-            badge_minus.set_color(C_PUMP_MINUS)
 
         # 2. Render Pump Pulses:
         # STRICT REQUIREMENT: COMPLETELY ABSORBED AT SAMPLE DISC (z = z_sample)
