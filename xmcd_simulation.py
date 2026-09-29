@@ -183,31 +183,39 @@ def build_simulation(output_path=None, preview_only=False, fps=30, duration_sec=
         T_plus_curve, T_minus_curve, Asym_curve
     ) = setup_2d_plots(ax_t, ax_asym, delays)
 
-    # 3D pulse wave objects (CONSTANT LINEWIDTH as requested by user)
-    line_pump, = ax_3d.plot([], [], [], linewidth=2.8)
-    line_probe_in, = ax_3d.plot([], [], [], color=C_PROBE, linewidth=2.6)
-    line_probe_out, = ax_3d.plot([], [], [], color=C_PROBE, linewidth=2.6)
+    # 3D pulse wave objects
+    # Pump pulse: large circular pulse
+    line_pump, = ax_3d.plot([], [], [], linewidth=3.0)
+    # Stream of smaller probe pulses: constant linewidth (2.4), tight circular helices
+    line_probe, = ax_3d.plot([], [], [], color=C_PROBE, linewidth=2.4)
 
     # Discretized coordinates along beamline
-    pts_in = np.linspace(-0.2, z_sample, 180)
-    pts_out = np.linspace(z_sample, z_screen, 180)
+    pts_axis = np.linspace(-0.2, z_screen, 460)
 
     # Physics parameters:
-    # Pump: optical carrier wavelength
-    lambda_pump = 0.55
+    # Pump: optical carrier wavelength (800 nm equivalent)
+    lambda_pump = 0.50
     k_pump = 2 * np.pi / lambda_pump
+    sigma_pump = 0.30
+    A_pump = 0.85
+
     # Probe: circular XUV probe pulse with shorter carrier wavelength (tighter corkscrew)
-    lambda_probe = 0.28
+    lambda_probe = 0.22
     k_probe = 2 * np.pi / lambda_probe
+    sigma_probe = 0.15
+    A_probe_in = 0.48
+    d_probe = 0.80             # Spacing between consecutive probe pulses in stream
+    v_probe = 1.65             # Fast stream of smaller probe pulses
 
-    sigma_z = 0.42           # Gaussian envelope spatial width
-    v = pulse_speed          # Calm, smooth propagation speed
-
+    # Pump timing & linear trajectory across beamline
     total_frames = int(fps * duration_sec)
     half_frames = total_frames // 2
+    half_period = duration_sec / 2.0
 
-    # Spatial offset between pump and probe (probe follows behind pump)
-    delta_z_delay = 1.45
+    z_pump_start = 0.8
+    z_pump_end = 6.4
+    v_pump = (z_pump_end - z_pump_start) / half_period
+    t_hit = (z_sample - z_pump_start) / v_pump   # exact time when pump hits sample
 
     def update(frame_idx):
         # Two equal phases:
@@ -218,68 +226,100 @@ def build_simulation(output_path=None, preview_only=False, fps=30, duration_sec=
         progress = cycle_frame / float(half_frames)
 
         # Current time within cycle
-        t_cycle = progress * (duration_sec / 2.0)
+        t_cycle = progress * half_period
 
-        # Physical timing synchronization:
-        # Pump travels from z = -0.6 to z_sample = 3.5 at speed v
-        t_pump_hit = (z_sample - (-0.6)) / v   # 3.037 s when duration_sec/2 = 7.0 s
-        half_period = duration_sec / 2.0
-        if t_cycle < t_pump_hit:
-            current_tau = delays[0] * (1.0 - t_cycle / t_pump_hit)   # -1.5 ps -> 0.0 ps
+        # 1. Pump position and synchronous delay parameter tau
+        z_pump = z_pump_start + v_pump * t_cycle
+
+        if t_cycle < t_hit:
+            current_tau = delays[0] * (1.0 - t_cycle / t_hit)   # -1.5 ps -> 0.0 ps
         else:
-            current_tau = delays[-1] * ((t_cycle - t_pump_hit) / (half_period - t_pump_hit)) # 0.0 ps -> 5.0 ps
+            current_tau = delays[-1] * ((t_cycle - t_hit) / (half_period - t_hit)) # 0.0 ps -> 5.0 ps
 
         idx_tau = int(np.clip(np.searchsorted(delays, current_tau), 0, len(delays) - 1))
 
-        # Centers of the traveling pulses
-        z_pump_center = -0.6 + v * t_cycle
-        z_probe_center = z_pump_center - delta_z_delay
-
-        # 1. Pump Pulse (Circular helix, absorbed at sample)
-        pump_color = C_PUMP_PLUS if is_sigma_plus else C_PUMP_MINUS
-        line_pump.set_color(pump_color)
-
-        env_pump = np.exp(-0.5 * ((pts_in - z_pump_center) / sigma_z)**2)
-        phase_pump = k_pump * (pts_in - z_pump_center)
-        mask_pump = env_pump > 0.012
-        if is_sigma_plus:
-            Ex_pump = np.where(mask_pump, env_pump * 0.75 * np.cos(phase_pump), np.nan)
-            Ey_pump = np.where(mask_pump, env_pump * 0.75 * np.sin(phase_pump), np.nan)
+        # Update status badge in 3D
+        if t_cycle < t_hit - 0.4:
+            badge_text.set_text(r"Pump Approaching Sample ($\tau < 0$, Ground State)")
+            badge_text.set_color(C_MUTED)
+        elif is_sigma_plus:
             badge_text.set_text(r"Pump: $\sigma^+$ (Circular)  $\rightarrow$  Heavy Probe Absorption ($T^+ = 8\%$)")
             badge_text.set_color(C_PUMP_PLUS)
         else:
-            Ex_pump = np.where(mask_pump, env_pump * 0.75 * np.cos(phase_pump), np.nan)
-            Ey_pump = np.where(mask_pump, -env_pump * 0.75 * np.sin(phase_pump), np.nan)
             badge_text.set_text(r"Pump: $\sigma^-$ (Circular)  $\rightarrow$  High Probe Transmission ($T^- = 82\%$)")
             badge_text.set_color(C_PUMP_MINUS)
 
+        # 2. Render Pump Pulse (Single prominent circular wave packet)
+        pump_color = C_PUMP_PLUS if is_sigma_plus else C_PUMP_MINUS
+        line_pump.set_color(pump_color)
+
+        # Pump passes through with transmitted intensity after sample
+        A_pump_curr = np.where(pts_axis < z_sample, A_pump, A_pump * 0.55)
+        env_pump = np.exp(-0.5 * ((pts_axis - z_pump) / sigma_pump)**2)
+        phase_pump = k_pump * (pts_axis - z_pump)
+        mask_pump = env_pump > 0.015
+
+        if is_sigma_plus:
+            Ex_pump = np.where(mask_pump, env_pump * A_pump_curr * np.cos(phase_pump), np.nan)
+            Ey_pump = np.where(mask_pump, env_pump * A_pump_curr * np.sin(phase_pump), np.nan)
+        else:
+            Ex_pump = np.where(mask_pump, env_pump * A_pump_curr * np.cos(phase_pump), np.nan)
+            Ey_pump = np.where(mask_pump, -env_pump * A_pump_curr * np.sin(phase_pump), np.nan)
+
         line_pump.set_data(Ex_pump, Ey_pump)
-        line_pump.set_3d_properties(pts_in, zdir='x')
+        line_pump.set_3d_properties(pts_axis, zdir='x')
 
-        # 2. Probe Pulse IN: CIRCULAR HELIX (constant linewidth, full amplitude)
-        env_probe_in = np.exp(-0.5 * ((pts_in - z_probe_center) / sigma_z)**2)
-        phase_probe_in = k_probe * (pts_in - z_probe_center)
-        mask_probe_in = env_probe_in > 0.012
-        A_probe_in = 0.85
-        Ex_probe_in = np.where(mask_probe_in, env_probe_in * A_probe_in * np.cos(phase_probe_in), np.nan)
-        Ey_probe_in = np.where(mask_probe_in, env_probe_in * A_probe_in * np.sin(phase_probe_in), np.nan)
-        line_probe_in.set_data(Ex_probe_in, Ey_probe_in)
-        line_probe_in.set_3d_properties(pts_in, zdir='x')
+        # 3. Render Stream of Smaller Probe Pulses
+        # Continuous pulse train flowing along optical axis
+        Ex_probe = np.full_like(pts_axis, np.nan)
+        Ey_probe = np.full_like(pts_axis, np.nan)
 
-        # 3. Probe Pulse OUT: CIRCULAR HELIX WITH EXAGGERATED AMPLITUDE ATTENUATION
-        # Linewidth stays strictly constant (2.6); physical helix radius collapses to 8% under sigma+!
-        T_transmitted = 0.08 if is_sigma_plus else 0.82
-        A_probe_out = A_probe_in * T_transmitted
+        # Range of packet indices currently crossing or near the rail
+        k_min = int(np.floor((v_probe * t_cycle - z_screen - 1.0) / d_probe))
+        k_max = int(np.ceil((v_probe * t_cycle - (-0.5) + 1.0) / d_probe))
 
-        env_probe_out = np.exp(-0.5 * ((pts_out - z_probe_center) / sigma_z)**2)
-        phase_probe_out = k_probe * (pts_out - z_probe_center)
-        mask_probe_out = env_probe_out > 0.012
+        for k in range(k_min, k_max + 1):
+            z_pk = v_probe * t_cycle - k * d_probe
+            if z_pk < -0.6 or z_pk > z_screen + 0.6:
+                continue
 
-        Ex_probe_out = np.where(mask_probe_out, env_probe_out * A_probe_out * np.cos(phase_probe_out), np.nan)
-        Ey_probe_out = np.where(mask_probe_out, env_probe_out * A_probe_out * np.sin(phase_probe_out), np.nan)
+            # Moment this packet crossed the sample disc (z = z_sample)
+            t_cross_k = (z_sample + k * d_probe) / v_probe
 
-        line_probe_out.set_data(Ex_probe_out, Ey_probe_out)
-        line_probe_out.set_3d_properties(pts_out, zdir='x')
+            if t_cross_k < t_hit:
+                # Crossed before pump: ground state transmission
+                T_k = 1.0
+            else:
+                # Crossed after pump: sample is demagnetized and relaxing!
+                tau_k = delays[-1] * ((t_cross_k - t_hit) / (half_period - t_hit))
+                tau_relax = 1.8
+                if is_sigma_plus:
+                    T_k = 1.0 - 0.92 * np.exp(-max(0.0, tau_k) / tau_relax)
+                else:
+                    T_k = 1.0 - 0.18 * np.exp(-max(0.0, tau_k) / tau_relax)
+
+            # Local envelope for packet k
+            mask_k = np.abs(pts_axis - z_pk) < 3.2 * sigma_probe
+            if not np.any(mask_k):
+                continue
+
+            z_sub = pts_axis[mask_k]
+            env_k = np.exp(-0.5 * ((z_sub - z_pk) / sigma_probe)**2)
+            phase_k = k_probe * (z_sub - z_pk)
+
+            # Amplitude: A_probe_in before sample, attenuated by T_k after sample
+            A_eff = np.where(z_sub < z_sample, A_probe_in, A_probe_in * T_k)
+
+            valid = env_k > 0.015
+            Ex_sub = np.where(valid, env_k * A_eff * np.cos(phase_k), np.nan)
+            Ey_sub = np.where(valid, env_k * A_eff * np.sin(phase_k), np.nan)
+
+            # Combine into overall probe line
+            Ex_probe[mask_k] = np.where(valid, Ex_sub, Ex_probe[mask_k])
+            Ey_probe[mask_k] = np.where(valid, Ey_sub, Ey_probe[mask_k])
+
+        line_probe.set_data(Ex_probe, Ey_probe)
+        line_probe.set_3d_properties(pts_axis, zdir='x')
 
         # 4. Update 2D Graphs
         if is_sigma_plus:
@@ -300,14 +340,14 @@ def build_simulation(output_path=None, preview_only=False, fps=30, duration_sec=
         vline_asym.set_xdata([current_tau, current_tau])
 
         return (
-            line_pump, line_probe_in, line_probe_out, badge_text,
+            line_pump, line_probe, badge_text,
             line_t_plus, line_t_minus, line_asym,
             marker_t_plus, marker_t_minus, marker_asym,
             vline_t, vline_asym
         )
 
     if preview_only:
-        update(int(half_frames * 1.70))
+        update(int(half_frames * 1.60))
         preview_file = Path("xmcd_preview.png")
         fig.savefig(preview_file, dpi=120, facecolor=fig.get_facecolor(), edgecolor='none')
         plt.close(fig)
@@ -337,7 +377,7 @@ if __name__ == "__main__":
     parser.add_argument("--preview", action="store_true", help="Save a single high-res preview frame")
     parser.add_argument("--output", type=str, default=None, help="Output filename (.mp4 or .gif)")
     parser.add_argument("--fps", type=int, default=30, help="Frames per second")
-    parser.add_argument("--duration", type=float, default=14.0, help="Duration of full two-pulse cycle in seconds")
+    parser.add_argument("--duration", type=float, default=20.0, help="Duration of full two-pulse cycle in seconds")
     parser.add_argument("--speed", type=float, default=1.35, help="Pulse propagation speed along optical axis")
     args = parser.parse_args()
 
