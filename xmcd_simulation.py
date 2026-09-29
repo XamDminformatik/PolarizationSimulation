@@ -347,7 +347,7 @@ def build_simulation(output_path=None, preview_only=False, fps=30, duration_sec=
         )
 
     if preview_only:
-        update(int(half_frames * 1.60))
+        update(int(half_frames * 0.60))
         preview_file = Path("xmcd_preview.png")
         fig.savefig(preview_file, dpi=120, facecolor=fig.get_facecolor(), edgecolor='none')
         plt.close(fig)
