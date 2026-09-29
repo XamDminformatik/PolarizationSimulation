@@ -43,10 +43,10 @@ def create_figure():
     fig = plt.figure(figsize=(16, 9), facecolor=C_BG)
     gs = fig.add_gridspec(
         2, 2,
-        width_ratios=[1.65, 1.05],
+        width_ratios=[2.20, 1.0],
         height_ratios=[1.0, 1.0],
-        left=0.02, right=0.96, top=0.95, bottom=0.08,
-        wspace=0.18, hspace=0.22
+        left=0.00, right=0.97, top=0.96, bottom=0.06,
+        wspace=0.08, hspace=0.04
     )
 
     ax_3d_plus  = fig.add_subplot(gs[0, 0], projection='3d', facecolor=C_BG)
@@ -57,8 +57,9 @@ def create_figure():
     return fig, ax_3d_plus, ax_3d_minus, ax_t, ax_asym
 
 def setup_3d_axes(ax_3d, title_text, title_color):
-    ax_3d.set_box_aspect((4.0, 1.2, 1.1))
-    ax_3d.view_init(elev=16, azim=-62)
+    # Zoom in camera massively to fill the entire subplot rectangle
+    ax_3d.set_box_aspect((4.4, 1.1, 0.95), zoom=1.65)
+    ax_3d.view_init(elev=14, azim=-62)
 
     ax_3d.xaxis.set_pane_color((0, 0, 0, 0))
     ax_3d.yaxis.set_pane_color((0, 0, 0, 0))
@@ -66,9 +67,9 @@ def setup_3d_axes(ax_3d, title_text, title_color):
     ax_3d.grid(False)
     ax_3d.set_axis_off()
 
-    ax_3d.set_xlim(-0.2, 7.2)
-    ax_3d.set_ylim(-1.5, 1.5)
-    ax_3d.set_zlim(-1.5, 2.1)
+    ax_3d.set_xlim(0.0, 7.0)
+    ax_3d.set_ylim(-1.20, 1.20)
+    ax_3d.set_zlim(-1.42, 1.25)
 
     z_rail = np.linspace(-0.2, 7.0, 100)
     ax_3d.plot(z_rail, np.zeros_like(z_rail), np.zeros_like(z_rail),
@@ -76,9 +77,9 @@ def setup_3d_axes(ax_3d, title_text, title_color):
     ax_3d.plot(z_rail, np.zeros_like(z_rail), np.full_like(z_rail, -1.4),
                color=C_MOUNT, linestyle='-', linewidth=2.8, alpha=0.5, zorder=1)
 
-    # 2D screen-space title badge to prevent any overlap with 3D mounts
-    badge = ax_3d.text2D(0.48, 0.90, title_text, transform=ax_3d.transAxes,
-                         fontsize=12.0, fontweight='bold', ha='center', color=title_color)
+    # Clean 2D screen-space title badge filling upper region
+    badge = ax_3d.text2D(0.48, 0.93, title_text, transform=ax_3d.transAxes,
+                         fontsize=13.5, fontweight='bold', ha='center', color=title_color)
     return badge
 
 def draw_sample(ax_3d, z_pos):
@@ -107,9 +108,6 @@ def draw_sample(ax_3d, z_pos):
     # Magnetization vector arrow (M along optical axis)
     ax_3d.quiver(z_pos, 0, 0, 0.72, 0, 0, color='white', linewidth=3.0, arrow_length_ratio=0.28)
     ax_3d.text(z_pos + 0.82, 0, 0.18, r"$\mathbf{M}$", color='white', fontsize=12, fontweight='bold')
-
-    # Label above sample
-    ax_3d.text(z_pos, 0, R + 0.22, "Magnetic Sample (Pt/Co)", color=C_TEXT, fontsize=10.0, fontweight='bold', ha='center')
 
 def draw_detector(ax_3d, z_pos):
     """Draws detection screen at the output."""
