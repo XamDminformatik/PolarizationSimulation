@@ -83,7 +83,7 @@ def setup_3d_axes(ax_3d, title_text, title_color):
     return badge
 
 def draw_sample(ax_3d, z_pos):
-    """Draws magnetic sample disc with clamp and magnetization arrow."""
+    """Draws sample disc with clamp (no in-plane M arrow — magnetization is out of plane)."""
     R = 1.02
     theta = np.linspace(0, 2 * np.pi, 60)
 
@@ -104,10 +104,6 @@ def draw_sample(ax_3d, z_pos):
     disc_y = RR * np.sin(TH)
     disc_z = np.full_like(disc_x, z_pos)
     ax_3d.plot_surface(disc_z, disc_x, disc_y, alpha=0.45, color='#5E6E88', edgecolor='none')
-
-    # Magnetization vector arrow (M along optical axis)
-    ax_3d.quiver(z_pos, 0, 0, 0.72, 0, 0, color='white', linewidth=3.0, arrow_length_ratio=0.28)
-    ax_3d.text(z_pos + 0.82, 0, 0.18, r"$\mathbf{M}$", color='white', fontsize=12, fontweight='bold')
 
 def draw_detector(ax_3d, z_pos):
     """Draws detection screen at the output."""
