@@ -234,12 +234,13 @@ def build_simulation(output_path=None, preview_only=False, fps=30, duration_sec=
     sigma_probe = 0.15
     A_probe_in = 0.46
     d_probe = 0.82             # Spacing between consecutive probe pulses in stream
-    v_probe = 1.60             # Fast stream of smaller probe pulses
+    # Scale with duration so a shorter cycle stays spatially equivalent (+20% wall-clock speed).
+    v_probe = 1.60 * (16.0 / duration_sec)
 
     # Pump timing & linear trajectory towards sample
     total_frames = int(fps * duration_sec)
     z_pump_start = 0.5
-    t_hit = 4.2                # seconds when pump reaches sample (tau = 0)
+    t_hit = 4.2 * (duration_sec / 16.0)  # pump hits sample at same relative progress
     v_pump = (z_sample - z_pump_start) / t_hit  # constant approach velocity
 
     def update(frame_idx):
@@ -389,7 +390,12 @@ if __name__ == "__main__":
     parser.add_argument("--preview", action="store_true", help="Save a single high-res preview frame")
     parser.add_argument("--output", type=str, default=None, help="Output filename (.mp4 or .gif)")
     parser.add_argument("--fps", type=int, default=30, help="Frames per second")
-    parser.add_argument("--duration", type=float, default=16.0, help="Duration of simulation cycle in seconds")
+    parser.add_argument(
+        "--duration",
+        type=float,
+        default=16.0 / 1.2,
+        help="Duration of simulation cycle in seconds (default ~13.3 s = 20%% faster than 16 s)",
+    )
     args = parser.parse_args()
 
     build_simulation(
